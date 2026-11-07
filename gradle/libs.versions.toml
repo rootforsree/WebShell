@@ -8,7 +8,7 @@ activityCompose = "1.13.0"
 navigation = "2.9.8"
 ktor = "3.6.0"
 serialization = "1.9.0"
-collectionsImmutable = "0.3.9"
+collectionsImmutable = "0.3.8"
 coreKtx = "1.16.0"
 desugar = "2.1.5"
 

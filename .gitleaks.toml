@@ -1,0 +1,14 @@
+# .gitleaks.toml — WebShell secret scanning.
+#
+# The vendored xterm.js bundle (app/src/main/assets/web/) is third-party
+# code pinned from the xterm.js 5.3.0 release. Minified JavaScript trips
+# gitleaks' generic-api-key rule on random-looking strings inside the
+# bundle. Nothing in those files is a secret of ours, and no secret of
+# ours ever goes in there: the web shell token is generated at runtime
+# and never written to a file. So the vendored assets are allowlisted
+# by path. Everything else in the repo is scanned as normal.
+
+[allowlist]
+paths = [
+  '''app/src/main/assets/web/.*''',
+]
