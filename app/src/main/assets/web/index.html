@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WebShell</title>
+<link rel="stylesheet" href="/xterm.css">
+<style>
+  html, body { margin: 0; height: 100%; background: #000; }
+  #terminal { height: 100%; }
+  #terminal .xterm-viewport { overflow-y: auto; }
+</style>
+</head>
+<body>
+<div id="terminal"></div>
+<script src="/xterm.js"></script>
+<script src="/addon-fit.js"></script>
+<script>
+  // The server replaces __TOKEN__ with the per-start token before serving.
+  var TOKEN = "__TOKEN__";
+
+  var term = new Terminal({
+    cursorBlink: true,
+    fontSize: 14,
+    fontFamily: "Menlo, Consolas, 'DejaVu Sans Mono', monospace",
+    theme: { background: "#000000", foreground: "#e8e8e8" },
+    scrollback: 5000
+  });
+  var fit = new FitAddon.FitAddon();
+  term.loadAddon(fit);
+  term.open(document.getElementById("terminal"));
+  fit.fit();
+
+  var ws = new WebSocket(
+    (location.protocol === "https:" ? "wss://" : "ws://") +
+    location.host + "/ws?token=" + encodeURIComponent(TOKEN)
+  );
+  ws.binaryType = "arraybuffer";
+
+  function sendResize() {
+    if (ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+    }
+  }
+
+  ws.onopen = function () {
+    term.write("\r\n[connected to WebShell]\r\n");
+    sendResize();
+  };
+  ws.onmessage = function (e) {
+    if (e.data instanceof ArrayBuffer) {
+      term.write(new Uint8Array(e.data));
+    }
+  };
+  ws.onclose = function () {
+    term.write("\r\n[disconnected]\r\n");
+  };
+  ws.onerror = function () {
+    term.write("\r\n[connection error]\r\n");
+  };
+
+  // Keystrokes go out as binary frames, so bytes like Ctrl-C (0x03)
+  // reach the shell exactly. Resize goes out as a JSON text frame.
+  term.onData(function (data) {
+    if (ws.readyState === 1) {
+      ws.send(new TextEncoder().encode(data));
+    }
+  });
+  term.onResize(function () { sendResize(); });
+  window.addEventListener("resize", function () { fit.fit(); });
+</script>
+</body>
+</html>

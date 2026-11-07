@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Framework parent on purpose: the app is 100 percent Compose, so
+         the Activity theme only covers the launch window. Two library
+         theme names failed AAPT linking in CI (Material3 DayNight and
+         framework DayNight, which does not exist in the framework), and
+         nothing in the UI reads the Activity theme (colors come from
+         WebShellTheme). Theme.Material.NoActionBar always exists. -->
+    <style name="Theme.WebShell" parent="@android:style/Theme.Material.NoActionBar" />
+</resources>

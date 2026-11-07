@@ -1,0 +1,16 @@
+# Gradle
+.gradle/
+build/
+local.properties
+
+# Android Studio
+*.iml
+.idea/
+*.hprof
+
+# Signing: never commit a keystore or its passwords.
+*.jks
+*.keystore
+
+# macOS / editor noise
+.DS_Store
