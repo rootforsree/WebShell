@@ -15,4 +15,6 @@ dependencies {
     implementation(libs.kotlinx.collections.immutable)
     // ContextCompat / NotificationCompat, used directly.
     implementation(libs.androidx.core.ktx)
+    // Unit tests (JUnit 4).
+    testImplementation(libs.junit)
 }
