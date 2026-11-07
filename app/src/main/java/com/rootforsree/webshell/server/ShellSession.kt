@@ -219,13 +219,24 @@ class ShellSession private constructor(
                 process = ProcessBuilder("/system/bin/sh", "-i").start()
                 usesSetsid = false
             }
-            val pid = process.pid().toInt()
+            // The shell's pid, for Ctrl-C. Process.pid() is NOT usable
+            // here: javac sees it, but the Kotlin compiler cannot
+            // resolve it (or toHandle()) against the Android stubs, so
+            // the pid is found by scanning /proc for a child of this
+            // process instead. Verified with kotlinc 2.0.20 + javac 17
+            // against the API 36 android.jar before writing this.
+            val shellPid = findShellPid()
             val sendSignal: () -> Unit = {
-                if (usesSetsid) {
-                    Os.kill(-pid, OsConstants.SIGINT)
-                } else {
-                    Os.kill(pid, OsConstants.SIGINT)
+                val pid = shellPid
+                if (pid != null) {
+                    if (usesSetsid) {
+                        Os.kill(-pid, OsConstants.SIGINT)
+                    } else {
+                        Os.kill(pid, OsConstants.SIGINT)
+                    }
                 }
+                // No pid found: nothing to signal, and the byte is
+                // dropped rather than fed to the shell as input.
             }
             return ShellSession(
                 mode = ShellMode.PIPES,
@@ -237,6 +248,28 @@ class ShellSession private constructor(
                 onOutput = onOutput,
                 onExit = onExit,
             )
+        }
+
+        private fun findShellPid(): Int? {
+            val parentPid = Os.getpid()
+            var best: Int? = null
+            val entries = File("/proc").listFiles() ?: return null
+            for (entry in entries) {
+                val pid = entry.name.toIntOrNull() ?: continue
+                val stat = runCatching { File(entry, "stat").readText() }.getOrNull() ?: continue
+                val open = stat.indexOf('(')
+                val close = stat.lastIndexOf(')')
+                if (open < 0 || close <= open) continue
+                val comm = stat.substring(open + 1, close)
+                if (comm != "sh" && comm != "setsid") continue
+                // After "(comm)" comes " state ppid ...": ppid is field 1.
+                val fields = stat.substring(close + 2).split(' ')
+                val ppid = fields.getOrNull(1)?.toIntOrNull() ?: continue
+                if (ppid == parentPid && (best == null || pid > best)) {
+                    best = pid
+                }
+            }
+            return best
         }
     }
 }

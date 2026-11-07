@@ -26,7 +26,6 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
-import kotlin.time.Duration.Companion.seconds
 
 /** What a started server hands back to the UI. */
 data class ServerInfo(
@@ -76,8 +75,8 @@ class WebShellServer(
         val assets = readAssets()
         val server = embeddedServer(CIO, port = port, host = "0.0.0.0") {
             install(WebSockets) {
-                pingPeriod = 20.seconds
-                timeout = 20.seconds
+                pingPeriodMillis = 20_000
+                timeoutMillis = 20_000
             }
             routing {
                 get("/") {
