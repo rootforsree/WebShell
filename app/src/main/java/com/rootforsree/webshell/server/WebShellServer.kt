@@ -150,6 +150,13 @@ class WebShellServer(
         )
         onLog("Browser connected (${shell.mode} shell).")
         shell.start()
+        // First-input diagnostic, one line per connection: if the user
+        // types and this line never appears, the keystrokes are dying
+        // in the browser (xterm/IME), not on the server. If it appears
+        // and nothing echoes, the break is between the server and the
+        // shell. Read the frame bytes once and reuse them: a frame's
+        // packet is consumed by the read.
+        var firstInputLogged = false
         val sender = launch {
             for (bytes in outgoing) {
                 try {
@@ -162,7 +169,14 @@ class WebShellServer(
         try {
             for (frame in incoming) {
                 when (frame) {
-                    is Frame.Binary -> shell.write(frame.readBytes())
+                    is Frame.Binary -> {
+                        val bytes = frame.readBytes()
+                        if (!firstInputLogged) {
+                            firstInputLogged = true
+                            onLog("First input received (${bytes.size} bytes).")
+                        }
+                        shell.write(bytes)
+                    }
                     is Frame.Text -> handleControl(frame.readText(), shell)
                     is Frame.Close -> break
                     else -> {

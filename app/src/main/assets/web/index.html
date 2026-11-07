@@ -9,10 +9,25 @@
   html, body { margin: 0; height: 100%; background: #000; }
   #terminal { height: 100%; }
   #terminal .xterm-viewport { overflow-y: auto; }
+  #copyBtn {
+    display: none;
+    position: fixed;
+    right: 12px;
+    bottom: 12px;
+    z-index: 1000;
+    background: #007AFF;
+    color: #fff;
+    border: 0;
+    border-radius: 999px;
+    padding: 12px 20px;
+    font-size: 16px;
+    font-family: inherit;
+  }
 </style>
 </head>
 <body>
 <div id="terminal"></div>
+<button id="copyBtn" type="button">Copy</button>
 <script src="/xterm.js"></script>
 <script src="/addon-fit.js"></script>
 <script>
@@ -28,7 +43,8 @@
   });
   var fit = new FitAddon.FitAddon();
   term.loadAddon(fit);
-  term.open(document.getElementById("terminal"));
+  var terminalEl = document.getElementById("terminal");
+  term.open(terminalEl);
   fit.fit();
 
   var ws = new WebSocket(
@@ -68,6 +84,100 @@
   });
   term.onResize(function () { sendResize(); });
   window.addEventListener("resize", function () { fit.fit(); });
+
+  // Mobile focus: xterm.js only focuses its hidden textarea on
+  // mousedown, and a tap on a phone is a touch first. Focus from the
+  // touch itself, inside the user gesture, so the keyboard opens
+  // reliably when the terminal is tapped.
+  terminalEl.addEventListener("touchstart", function () {
+    term.focus();
+  }, { passive: true });
+
+  // Touch selection: xterm.js selection is mouse-only (drag to select)
+  // and the terminal renders on canvas, so a finger cannot select text
+  // and long-press does nothing. Long-press (hold still ~600ms)
+  // selects the whole line under the finger and shows Copy. Copy uses
+  // the clipboard API when the page allows it and falls back to
+  // execCommand, because this page is plain HTTP and
+  // navigator.clipboard needs a secure context.
+  var copyBtn = document.getElementById("copyBtn");
+  var pressTimer = null;
+  var pressX = 0, pressY = 0;
+
+  function cancelPress() {
+    if (pressTimer !== null) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+    }
+  }
+
+  function selectLineAt(clientY) {
+    var rect = terminalEl.getBoundingClientRect();
+    if (term.rows <= 0) return;
+    var rowHeight = rect.height / term.rows;
+    var visibleRow = Math.floor((clientY - rect.top) / rowHeight);
+    if (visibleRow < 0) visibleRow = 0;
+    if (visibleRow > term.rows - 1) visibleRow = term.rows - 1;
+    var bufferRow = term.buffer.active.viewportY + visibleRow;
+    term.selectLines(bufferRow, bufferRow);
+    copyBtn.style.display = "block";
+    copyBtn.textContent = "Copy";
+  }
+
+  terminalEl.addEventListener("touchstart", function (e) {
+    if (e.touches.length !== 1) { cancelPress(); return; }
+    pressX = e.touches[0].clientX;
+    pressY = e.touches[0].clientY;
+    cancelPress();
+    pressTimer = setTimeout(function () {
+      pressTimer = null;
+      selectLineAt(pressY);
+    }, 600);
+  }, { passive: true });
+
+  terminalEl.addEventListener("touchmove", function (e) {
+    if (pressTimer !== null && e.touches.length === 1) {
+      var dx = e.touches[0].clientX - pressX;
+      var dy = e.touches[0].clientY - pressY;
+      if (dx * dx + dy * dy > 144) cancelPress();
+    }
+  }, { passive: true });
+
+  terminalEl.addEventListener("touchend", cancelPress);
+  terminalEl.addEventListener("touchcancel", cancelPress);
+
+  copyBtn.addEventListener("click", function () {
+    var text = term.getSelection() || "";
+    copyBtn.textContent = "Copying...";
+    function done(ok) {
+      copyBtn.textContent = ok ? "Copied" : "Copy failed";
+      term.clearSelection();
+      setTimeout(function () { copyBtn.style.display = "none"; }, 800);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        function () { done(true); },
+        function () { legacyCopy(text, done); }
+      );
+    } else {
+      legacyCopy(text, done);
+    }
+  });
+
+  function legacyCopy(text, done) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (err) { ok = false; }
+    document.body.removeChild(ta);
+    term.focus();
+    done(ok);
+  }
 </script>
 </body>
 </html>
