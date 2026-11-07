@@ -33,11 +33,16 @@ all files access** is optional: without it the shell still works, but
   0.10.0, no CDN) and a WebSocket endpoint at `/ws`.
 - Each browser connection gets its own `/system/bin/sh`.
 - The shell prefers a real PTY: the server opens `/dev/ptmx`,
-  finds the new `/dev/pts` slave, and gives the shell that slave as
-  stdin/stdout/stderr. Tab completion, Ctrl-C, and full-screen apps
-  behave like a real terminal. (`android.system.Os` has no `openpty`,
-  `fork`, or `ioctl`, so the PTY is built from `Os.open` on
-  `/dev/ptmx` plus `ProcessBuilder` redirects instead.)
+  finds the new `/dev/pts` slave, runs the shell through `setsid`
+  so it is a session leader, and the child reopens the slave itself
+  (`exec 0<slave 1>slave 2>slave`), which acquires the slave as its
+  controlling terminal. Tab completion, Ctrl-C, Ctrl-Z, and
+  full-screen apps behave like a real terminal; `tty` reports
+  `/dev/pts/N` and `stty` runs clean. (`android.system.Os` has no
+  `openpty`, `fork`, or `ioctl`, so the PTY is built from `Os.open`
+  on `/dev/ptmx` plus `setsid` instead. Redirecting the shell's
+  stdio straight to the slave does NOT work: the child is not a
+  session leader, so the open acquires no controlling terminal.)
 - When a PTY is unavailable the server falls back to pipe-based
   stdin/stdout/stderr streaming, with Ctrl-C translated into SIGINT.
 - Auth is a random token generated on each start, required as
