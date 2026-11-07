@@ -3,6 +3,7 @@ package com.rootforsree.webshell.server
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import androidx.core.content.ContextCompat
@@ -69,7 +70,12 @@ class ServerHost(private val context: Context) {
     }
 
     /** True when the shell can already touch all of /sdcard. */
-    fun hasAllFilesAccess(): Boolean = Environment.isExternalStorageManager()
+    fun hasAllFilesAccess(): Boolean {
+        // isExternalStorageManager exists only from API 30; below that
+        // the answer is always false.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
+        return Environment.isExternalStorageManager()
+    }
 
     /**
      * Opens the system screen that lets the user exempt the app from

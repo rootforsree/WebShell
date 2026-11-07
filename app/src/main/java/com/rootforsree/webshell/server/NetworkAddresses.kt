@@ -34,7 +34,8 @@ object NetworkAddresses {
             if (!iface.isUp || iface.isLoopback) continue
             for (address in iface.inetAddresses.toList()) {
                 if (address is Inet4Address && !address.isLoopbackAddress) {
-                    found.add(LanAddress(classify(iface.name, address.hostAddress), address.hostAddress))
+                    val host = address.hostAddress ?: continue
+                    found.add(LanAddress(classify(iface.name, host), host))
                 }
             }
         }
